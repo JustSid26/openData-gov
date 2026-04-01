@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ meta.name }} Dashboard · Open Data Gov</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: rgba(255,255,255,0.04); --surface2: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.08); --text: #e8e6e0; --muted: #7a7872;
+      --accent: {{ meta.color }}; --green: #4ade80; --red: #f87171; --blue: #60a5fa;
+      --amber: #fbbf24; --teal: #2dd4bf; --purple: #a78bfa; --radius: 12px;
+    }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+    .page { max-width: 1320px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+
+    /* Top nav */
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .back-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; text-decoration: none; transition: all .2s; }
+    .back-btn:hover { background: var(--surface2); color: var(--text); }
+    .ds-switcher { display: flex; gap: 4px; margin-left: auto; }
+    .ds-btn { font-size: 11px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; text-decoration: none; transition: all .15s; }
+    .ds-btn:hover { background: var(--surface2); }
+    .ds-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Header */
+    .header { margin-bottom: 1.5rem; }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .header h1 .icon { margin-right: 6px; }
+    .header p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 99px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); margin-left: 8px; vertical-align: middle; text-transform: uppercase; letter-spacing: .04em; }
+
+    /* KPI cards */
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; transition: all .2s; }
+    .card:hover { border-color: rgba(255,255,255,0.12); }
+    .card .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; font-weight: 500; }
+    .card .val { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+    .card .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .up { color: var(--green); } .down { color: var(--red); }
+
+    /* Alert */
+    .alert { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: var(--amber); margin-bottom: 1.25rem; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .tab { font-size: 12px; font-weight: 500; padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all .15s; }
+    .tab:hover { background: var(--surface2); color: var(--text); }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Chart containers */
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+    .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .chart-card .sub { font-size: 12px; color: var(--muted); margin-bottom: 1rem; }
+    .chart-wrap { position: relative; width: 100%; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+    /* Table */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 7px 10px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    .bar-bg { background: var(--surface2); border-radius: 3px; height: 8px; width: 100px; display: inline-block; vertical-align: middle; }
+    .bar-fg { height: 8px; border-radius: 3px; display: block; }
+    .flag-severe { color: var(--red); font-weight: 600; }
+    .flag-poor { color: var(--amber); font-weight: 600; }
+    .flag-heavy { color: var(--blue); font-weight: 600; }
+    .flag-normal { color: var(--green); }
+
+    /* Hadoop / Pipeline sections */
+    .hadoop-header { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; margin-bottom: 1rem; }
+    .pill { font-size: 10px; padding: 3px 10px; border-radius: 99px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .job-card { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+    .job-head { background: var(--surface2); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+    .job-head strong { font-size: 13px; }
+    .job-body { padding: 12px 14px; }
+    pre { font-family: 'SF Mono', ui-monospace, monospace; font-size: 11px; color: var(--muted); background: var(--surface2); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre; border: 1px solid var(--border); }
+
+    select { font-size: 12px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-family: inherit; }
+    .ctrl-row { display: flex; gap: 10px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+
+    .pipeline-flow { display: flex; align-items: center; gap: 0; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0; }
+    .pipe-step { font-size: 12px; font-weight: 500; padding: 8px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
+    .pipe-arrow { color: var(--muted); opacity: 0.4; padding: 0 6px; font-size: 14px; }
+
+    .hidden { display: none; }
+    @media (max-width: 768px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <a href="/" class="back-btn">← All Datasets</a>
+    <div class="ds-switcher">
+      {% for key, d in all_meta.items() %}
+      <a href="/dashboard/{{ key }}" class="ds-btn {% if key == dataset %}active{% endif %}">{{ d.icon }} {{ d.name }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1><span class="icon">{{ meta.icon }}</span>{{ meta.name }} Dashboard <span class="badge">2025 · Open Data</span></h1>
+    <p>{{ meta.desc }}</p>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="metrics" id="kpi-cards"></div>
+
+  <!-- Alert -->
+  <div class="alert" id="alert-banner" style="display:none;"></div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tab-bar"></div>
+
+  <!-- Tab panels -->
+  <div id="tab-trends"></div>
+  <div id="tab-regional" class="hidden"></div>
+  <div id="tab-details" class="hidden"></div>
+  <div id="tab-hadoop" class="hidden"></div>
+
+</div>
+
+<script>
+const DATASET = '{{ dataset }}';
+const ACCENT  = '{{ meta.color }}';
+const PALETTE = ['#4ade80','#60a5fa','#f87171','#fbbf24','#a78bfa','#2dd4bf','#fb923c','#e879f9'];
+const PALETTE_A = PALETTE.map(c => c + '25');
+const textColor = '#7a7872';
+const gridColor = 'rgba(255,255,255,0.05)';
+
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = textColor;
+function fmt(n) { return n.toLocaleString('en-IN', {maximumFractionDigits:2}); }
+
+let charts = {};
+let tabsLoaded = {};
+
+// ── Tab config per dataset ───────────────────────────────────
+const TAB_CONFIG = {
+  foodstock:  ['trends|Stock Trends', 'regional|Regional', 'details|Districts', 'hadoop|Hadoop Jobs'],
+  rainfall:   ['trends|Trends', 'regional|By State', 'details|Heatmap', 'hadoop|Hadoop Jobs'],
+  airquality: ['trends|AQI Trends', 'regional|By City', 'details|Pollutants', 'hadoop|Hadoop Jobs'],
+};
+
+function initTabs() {
+  const bar = document.getElementById('tab-bar');
+  TAB_CONFIG[DATASET].forEach((t, i) => {
+    const [id, label] = t.split('|');
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (i === 0 ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => setTab(id, btn);
+    bar.appendChild(btn);
+  });
+}
+
+function setTab(name, btn) {
+  ['trends','regional','details','hadoop'].forEach(t => document.getElementById('tab-'+t).classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.remove('hidden');
+  if (btn) btn.classList.add('active');
+  if (!tabsLoaded[name]) { tabsLoaded[name] = true; loadTab(name); }
+}
+
+function loadTab(name) {
+  if (DATASET === 'foodstock')  loadTabFood(name);
+  if (DATASET === 'rainfall')   loadTabRain(name);
+  if (DATASET === 'airquality') loadTabAir(name);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FOODSTOCK
+// ═══════════════════════════════════════════════════════════
+async function initFood() {
+  const d = await fetch('/api/foodstock/summary').then(r=>r.json());
+  document.getElementById('kpi-cards').innerHTML = `
+    <div class="card"><div class="lbl">Total Records</div><div class="val">${fmt(d.total_records)}</div><div class="sub">Across all districts & dates</div></div>
+    <div class="card"><div class="lbl">Districts Tracked</div><div class="val">${d.districts}</div><div class="sub">Regions: ${d.regions}</div></div>
+    <div class="card"><div class="lbl">Peak Stock</div><div class="val">${fmt(d.peak_stock_MT)} M</div><div class="sub">Million MT · ${d.peak_date}</div></div>
+    <div class="card"><div class="lbl">Apr Drawdown</div><div class="val down">↓ ${d.drop_pct}%</div><div class="sub">Mar-13 → Apr-10 decline</div></div>`;
+  const alert = document.getElementById('alert-banner');
+  alert.innerHTML = '⚠️ <strong>Sharp drawdown detected (Hadoop Job 2):</strong> National rice-raw stock fell ~46.9% between 13 Mar and 10 Apr 2025.';
+  alert.style.display = 'block';
+}
+
+async function loadTabFood(tab) {
+  if (tab === 'trends') {
+    const dd = await fetch('/api/foodstock/daily').then(r=>r.json());
+    const md = await fetch('/api/foodstock/monthly').then(r=>r.json());
+    document.getElementById('tab-trends').innerHTML = `
+      <div class="chart-card"><h3>Daily National Rice-Raw Stock</h3><div class="sub">Total stock across all districts (M MT) · Jan–May 2025</div><div class="chart-wrap" style="height:280px"><canvas id="c-daily"></canvas></div></div>
+      <div class="two-col">
+        <div class="chart-card"><h3>Monthly Average Stock</h3><div class="sub">Mean district-level stock per month (M MT)</div><div class="chart-wrap" style="height:220px"><canvas id="c-monthly"></canvas></div></div>
+        <div class="chart-card"><h3>Daily Delta</h3><div class="sub">Day-over-day change (M MT)</div><div class="chart-wrap" style="height:220px"><canvas id="c-delta"></canvas></div></div>
+      </div>`;
+    const deltas = dd.stocks.map((v,i) => i===0 ? 0 : +(v - dd.stocks[i-1]).toFixed(2));
+    mkLine('c-daily', dd.dates, dd.stocks, 'Stock (M MT)', ACCENT);
+    mkBar('c-monthly', md.months, md.avg_MT, 'Avg Stock (M MT)', ACCENT);
+    mkDelta('c-delta', dd.dates, deltas);
+  }
+  if (tab === 'regional') {
+    const rd = await fetch('/api/foodstock/regions?n=10').then(r=>r.json());
+    document.getElementById('tab-regional').innerHTML = `
+      <div class="chart-card"><h3>Top 10 Regions by Cumulative Stock</h3><div class="sub">Total stock Jan–May 2025 (B MT)</div><div class="chart-wrap" style="height:360px"><canvas id="c-regions"></canvas></div></div>
+      <div class="chart-card"><h3>Monthly Stock by Region (top 6)</h3><div class="sub">Stacked area showing regional share shifts</div><div id="legend-area" class="legend"></div><div class="chart-wrap" style="height:280px"><canvas id="c-area"></canvas></div></div>`;
+    mkHBar('c-regions', rd.regions, rd.stocks, 'Total (B MT)');
+    const at = await fetch('/api/foodstock/region_trend').then(r=>r.json());
+    mkStackedArea('c-area', at.months, at.series, 'legend-area');
+  }
+  if (tab === 'details') {
+    document.getElementById('tab-details').innerHTML = `
+      <div class="chart-card"><div class="ctrl-row"><select id="region-filter" onchange="reloadDistricts()"><option value="">All Regions</option></select><select id="topn-filter" onchange="reloadDistricts()"><option value="10">Top 10</option><option value="15">Top 15</option><option value="20">Top 20</option></select></div><h3>Top Districts by Stock</h3><div class="sub">Cumulative stock (B MT)</div><div class="chart-wrap" style="height:380px"><canvas id="c-districts"></canvas></div></div>`;
+    const regions = ['Punjab','Haryana','Uttar Pradesh','Chhattisgarh','Madhya Pradesh','Andhra Pradesh','Karnataka','Maharastra','Telangana','Gujarat','Assam','West Bengal','Bihar'];
+    const sel = document.getElementById('region-filter');
+    regions.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; sel.appendChild(o); });
+    reloadDistricts();
+  }
+  if (tab === 'hadoop') { loadHadoopFood(); }
+}
+
+async function reloadDistricts() {
+  const region = document.getElementById('region-filter').value;
+  const n = document.getElementById('topn-filter').value;
+  const url = `/api/foodstock/districts?n=${n}${region ? '&region='+encodeURIComponent(region) : ''}`;
+  const d = await fetch(url).then(r=>r.json());
+  if (charts['c-districts']) charts['c-districts'].destroy();
+  mkHBar('c-districts', d.districts, d.stocks, 'Stock (B MT)', '#4ade80');
+}
+
+async function loadHadoopFood() {
+  const j1 = await fetch('/api/hadoop/foodstock/region_stock').then(r=>r.json());
+  const j2 = await fetch('/api/hadoop/foodstock/daily_drawdown').then(r=>r.json());
+  const maxS = Math.max(...j1.records.map(r=>r.total_stock));
+  const drawdowns = j2.records.filter(r => r.delta_M < -4.5).slice(0,15);
+  document.getElementById('tab-hadoop').innerHTML = buildHadoopHTML('foodstock', j1, j2, maxS, drawdowns);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RAINFALL
+// ═══════════════════════════════════════════════════════════
+async function initRain() {
+  const d = await fetch('/api/rainfall/summary').then(r=>r.json());
+  document.getElementById('kpi-cards').innerHTML = `
+    <div class="card"><div class="lbl">Total Records</div><div class="val">${fmt(d.total_records)}</div><div class="sub">${d.states} states · ${d.districts} districts</div></div>
+    <div class="card"><div class="lbl">Avg Rainfall</div><div class="val">${fmt(d.avg_rainfall)} mm</div><div class="sub">Per district per day</div></div>
+    <div class="card"><div class="lbl">Peak Daily Total</div><div class="val">${fmt(d.max_daily_rain)} mm</div><div class="sub">${d.peak_rain_date}</div></div>
+    <div class="card"><div class="lbl">Climate</div><div class="val">${d.avg_temp}°C</div><div class="sub">Avg humidity: ${d.avg_humidity}%</div></div>`;
+}
+
+async function loadTabRain(tab) {
+  if (tab === 'trends') {
+    const dd = await fetch('/api/rainfall/daily').then(r=>r.json());
+    const md = await fetch('/api/rainfall/monthly').then(r=>r.json());
+    document.getElementById('tab-trends').innerHTML = `
+      <div class="chart-card"><h3>Daily Nationwide Rainfall</h3><div class="sub">Total rainfall across all reporting districts (mm)</div><div class="chart-wrap" style="height:280px"><canvas id="c-daily"></canvas></div></div>
+      <div class="two-col">
+        <div class="chart-card"><h3>Monthly Avg Rainfall</h3><div class="sub">Mean rainfall per district-day (mm)</div><div class="chart-wrap" style="height:220px"><canvas id="c-monthly"></canvas></div></div>
+        <div class="chart-card"><h3>Monthly Avg Temperature</h3><div class="sub">Mean temp across all districts (°C)</div><div class="chart-wrap" style="height:220px"><canvas id="c-temp"></canvas></div></div>
+      </div>`;
+    mkLine('c-daily', dd.dates, dd.rainfall, 'Rainfall (mm)', '#60a5fa');
+    mkBar('c-monthly', md.months, md.avg_rain, 'Avg Rain (mm)', '#60a5fa');
+    mkLine('c-temp', md.months, md.avg_temp, 'Temp (°C)', '#f87171', false);
+  }
+  if (tab === 'regional') {
+    const sd = await fetch('/api/rainfall/states?n=12').then(r=>r.json());
+    document.getElementById('tab-regional').innerHTML = `
+      <div class="chart-card"><h3>Top States by Total Rainfall</h3><div class="sub">Cumulative rainfall Jan–Jun 2025 (mm)</div><div class="chart-wrap" style="height:380px"><canvas id="c-states"></canvas></div></div>
+      <div class="chart-card"><h3>Monthly Rainfall by State (top 6)</h3><div class="sub">Stacked area showing state contributions</div><div id="legend-area" class="legend"></div><div class="chart-wrap" style="height:280px"><canvas id="c-area"></canvas></div></div>`;
+    mkHBar('c-states', sd.states, sd.rainfall, 'Rainfall (mm)', '#60a5fa');
+    const st = await fetch('/api/rainfall/state_trend').then(r=>r.json());
+    mkStackedArea('c-area', st.months, st.series, 'legend-area');
+  }
+  if (tab === 'details') {
+    const hm = await fetch('/api/rainfall/heatmap').then(r=>r.json());
+    document.getElementById('tab-details').innerHTML = `
+      <div class="chart-card"><h3>Rainfall Heatmap: State × Month</h3><div class="sub">Average daily rainfall (mm) — darker = heavier</div><div class="tbl-wrap"><table id="heatmap-table"><thead><tr><th>State</th>${hm.months.map(m=>'<th>'+m+'</th>').join('')}</tr></thead><tbody></tbody></table></div></div>`;
+    const tbody = document.querySelector('#heatmap-table tbody');
+    const allVals = hm.data.map(d=>d[2]);
+    const maxV = Math.max(...allVals);
+    hm.states.forEach((state, si) => {
+      let row = `<tr><td><strong>${state}</strong></td>`;
+      hm.months.forEach((_, mi) => {
+        const entry = hm.data.find(d => d[0]===mi && d[1]===si);
+        const v = entry ? entry[2] : 0;
+        const intensity = Math.min(1, v / (maxV * 0.6));
+        const bg = `rgba(96,165,250,${(intensity*0.5).toFixed(2)})`;
+        row += `<td style="background:${bg};text-align:center;font-size:11px;font-weight:500;">${v}</td>`;
+      });
+      row += '</tr>';
+      tbody.innerHTML += row;
+    });
+  }
+  if (tab === 'hadoop') { loadHadoopRain(); }
+}
+
+async function loadHadoopRain() {
+  const j1 = await fetch('/api/hadoop/rainfall/state_agg').then(r=>r.json());
+  const j2 = await fetch('/api/hadoop/rainfall/anomaly').then(r=>r.json());
+  const maxR = Math.max(...j1.records.map(r=>r.total_rain));
+  const heavy = j2.records.filter(r => r.flag==='HEAVY_RAIN').slice(0,15);
+  let html = `<div class="hadoop-header">Hadoop MapReduce Jobs <span class="pill">Streaming API</span></div>`;
+  html += buildPipeline();
+  html += `<div class="job-card"><div class="job-head"><strong>Job 1 — State Rainfall Aggregation</strong><span style="color:var(--green)">● Complete</span></div><div class="job-body">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mapper emits <code>state → rainfall_mm</code>. Reducer sums, averages, finds max per state.</p>
+    <pre>$ hadoop jar hadoop-streaming.jar \\
+  -input  hdfs:///data/rainfall-india-2025.csv \\
+  -output hdfs:///output/rainfall/state_agg \\
+  -mapper  mapper_rainfall_state.py \\
+  -reducer reducer_rainfall_state.py</pre>
+    <div style="margin-top:10px"><div style="font-size:12px;font-weight:600;margin-bottom:6px;">Output (part-00000):</div>
+    <div class="tbl-wrap"><table><thead><tr><th>State</th><th>Total Rain (mm)</th><th>Avg Rain</th><th>Max Rain</th><th>Records</th></tr></thead><tbody>
+    ${j1.records.slice(0,12).map(r=>`<tr><td><strong>${r.state}</strong></td><td>${fmt(r.total_rain)} <span class="bar-bg"><span class="bar-fg" style="width:${(r.total_rain/maxR*100).toFixed(1)}%;background:var(--blue)"></span></span></td><td>${r.avg_rain}</td><td>${r.max_rain}</td><td>${fmt(r.record_count)}</td></tr>`).join('')}
+    </tbody></table></div></div></div></div>`;
+  html += `<div class="job-card"><div class="job-head"><strong>Job 2 — Rainfall Anomaly Detection</strong><span style="color:var(--green)">● Complete</span></div><div class="job-body">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mapper emits <code>date → rainfall</code>. Reducer flags HEAVY_RAIN days above the 90th percentile.</p>
+    <pre>$ hadoop jar hadoop-streaming.jar \\
+  -input  hdfs:///data/rainfall-india-2025.csv \\
+  -output hdfs:///output/rainfall/anomaly \\
+  -mapper  mapper_rainfall_anomaly.py \\
+  -reducer reducer_rainfall_anomaly.py</pre>
+    <div style="margin-top:10px"><div style="font-size:12px;font-weight:600;margin-bottom:6px;">Heavy rainfall events:</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Total (mm)</th><th>Delta</th><th>% Change</th><th>Flag</th></tr></thead><tbody>
+    ${heavy.map(r=>`<tr><td>${r.date}</td><td>${fmt(r.total_mm)}</td><td class="${r.delta>0?'up':'down'}">${r.delta>0?'+':''}${fmt(r.delta)}</td><td class="${r.pct_chg>0?'up':'down'}">${r.pct_chg>0?'+':''}${r.pct_chg}%</td><td class="flag-heavy">${r.flag}</td></tr>`).join('')}
+    </tbody></table></div></div></div></div>`;
+  document.getElementById('tab-hadoop').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AIR QUALITY
+// ═══════════════════════════════════════════════════════════
+async function initAir() {
+  const d = await fetch('/api/airquality/summary').then(r=>r.json());
+  document.getElementById('kpi-cards').innerHTML = `
+    <div class="card"><div class="lbl">Total Records</div><div class="val">${fmt(d.total_records)}</div><div class="sub">${d.cities} cities · ${d.stations} stations</div></div>
+    <div class="card"><div class="lbl">Avg AQI</div><div class="val">${d.avg_aqi}</div><div class="sub">PM2.5: ${d.avg_pm25} · PM10: ${d.avg_pm10}</div></div>
+    <div class="card"><div class="lbl">Most Polluted</div><div class="val down">${d.worst_city}</div><div class="sub">Avg AQI: ${d.worst_city_aqi}</div></div>
+    <div class="card"><div class="lbl">Cleanest City</div><div class="val up">${d.best_city}</div><div class="sub">Avg AQI: ${d.best_city_aqi}</div></div>`;
+}
+
+async function loadTabAir(tab) {
+  if (tab === 'trends') {
+    const dd = await fetch('/api/airquality/daily').then(r=>r.json());
+    const md = await fetch('/api/airquality/monthly').then(r=>r.json());
+    const cd = await fetch('/api/airquality/categories').then(r=>r.json());
+    document.getElementById('tab-trends').innerHTML = `
+      <div class="chart-card"><h3>Daily Average AQI (Nationwide)</h3><div class="sub">Mean AQI across all stations · Jan–Jun 2025</div><div class="chart-wrap" style="height:280px"><canvas id="c-daily"></canvas></div></div>
+      <div class="two-col">
+        <div class="chart-card"><h3>Monthly Avg AQI & PM</h3><div class="sub">AQI, PM2.5, PM10 monthly trends</div><div class="chart-wrap" style="height:240px"><canvas id="c-monthly"></canvas></div></div>
+        <div class="chart-card"><h3>AQI Category Distribution</h3><div class="sub">Record count by AQI category</div><div class="chart-wrap" style="height:240px"><canvas id="c-cats"></canvas></div></div>
+      </div>`;
+    mkLine('c-daily', dd.dates, dd.aqi, 'Avg AQI', '#f87171');
+    const catColors = {'Good':'#4ade80','Satisfactory':'#60a5fa','Moderate':'#fbbf24','Poor':'#fb923c','Very Poor':'#f87171','Severe':'#dc2626'};
+    // Monthly multi-line
+    charts['c-monthly'] = new Chart(document.getElementById('c-monthly'), {
+      type: 'line', data: { labels: md.months, datasets: [
+        {label:'AQI',data:md.avg_aqi,borderColor:'#f87171',tension:.3,pointRadius:3,borderWidth:2},
+        {label:'PM2.5',data:md.avg_pm25,borderColor:'#fbbf24',tension:.3,pointRadius:3,borderWidth:2},
+        {label:'PM10',data:md.avg_pm10,borderColor:'#a78bfa',tension:.3,pointRadius:3,borderWidth:2},
+      ]}, options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10}}},scales:{x:{grid:{color:gridColor}},y:{grid:{color:gridColor}}}}
+    });
+    // Donut
+    charts['c-cats'] = new Chart(document.getElementById('c-cats'), {
+      type: 'doughnut', data: { labels: cd.categories, datasets: [{data:cd.counts,backgroundColor:cd.categories.map(c=>catColors[c]||'#666'),borderWidth:0}]},
+      options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:10,font:{size:11}}}},cutout:'55%'}
+    });
+  }
+  if (tab === 'regional') {
+    const worst = await fetch('/api/airquality/cities?n=15&order=worst').then(r=>r.json());
+    document.getElementById('tab-regional').innerHTML = `
+      <div class="chart-card"><h3>Most Polluted Cities (Avg AQI)</h3><div class="sub">Top 15 cities by average AQI · Jan–Jun 2025</div><div class="chart-wrap" style="height:420px"><canvas id="c-cities"></canvas></div></div>
+      <div class="chart-card"><h3>Monthly AQI by City (top 6 worst)</h3><div class="sub">AQI trend showing seasonal improvement</div><div id="legend-area" class="legend"></div><div class="chart-wrap" style="height:280px"><canvas id="c-area"></canvas></div></div>`;
+    mkHBar('c-cities', worst.cities, worst.aqi, 'Avg AQI', '#f87171');
+    const ct = await fetch('/api/airquality/city_trend').then(r=>r.json());
+    mkStackedArea('c-area', ct.months, ct.series, 'legend-area', false);
+  }
+  if (tab === 'details') {
+    const pd = await fetch('/api/airquality/pollutants').then(r=>r.json());
+    document.getElementById('tab-details').innerHTML = `
+      <div class="chart-card"><h3>Pollutant Breakdown by City</h3><div class="sub">Average pollutant concentrations for top 10 most polluted cities</div><div class="chart-wrap" style="height:380px"><canvas id="c-poll"></canvas></div></div>`;
+    charts['c-poll'] = new Chart(document.getElementById('c-poll'), {
+      type:'bar', data: { labels: pd.cities, datasets: [
+        {label:'PM2.5',data:pd.pm25,backgroundColor:'#f8717188',borderRadius:3},
+        {label:'PM10',data:pd.pm10,backgroundColor:'#fbbf2488',borderRadius:3},
+        {label:'NO₂',data:pd.no2,backgroundColor:'#60a5fa88',borderRadius:3},
+        {label:'O₃',data:pd.o3,backgroundColor:'#4ade8088',borderRadius:3},
+      ]}, options: {responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:10}}},scales:{x:{grid:{color:gridColor},ticks:{maxRotation:45}},y:{grid:{color:gridColor}}}}
+    });
+  }
+  if (tab === 'hadoop') { loadHadoopAir(); }
+}
+
+async function loadHadoopAir() {
+  const j1 = await fetch('/api/hadoop/airquality/city_agg').then(r=>r.json());
+  const j2 = await fetch('/api/hadoop/airquality/critical').then(r=>r.json());
+  const maxA = Math.max(...j1.records.map(r=>r.avg_aqi));
+  let html = `<div class="hadoop-header">Hadoop MapReduce Jobs <span class="pill">Streaming API</span></div>`;
+  html += buildPipeline();
+  html += `<div class="job-card"><div class="job-head"><strong>Job 1 — City AQI Aggregation</strong><span style="color:var(--green)">● Complete</span></div><div class="job-body">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mapper emits <code>city → AQI</code>. Reducer computes avg, max, min AQI per city.</p>
+    <pre>$ hadoop jar hadoop-streaming.jar \\
+  -input  hdfs:///data/air-quality-india-2025.csv \\
+  -output hdfs:///output/airquality/city_agg \\
+  -mapper  mapper_aqi_city.py \\
+  -reducer reducer_aqi_city.py</pre>
+    <div style="margin-top:10px"><div class="tbl-wrap"><table><thead><tr><th>City</th><th>Avg AQI</th><th>Max</th><th>Min</th><th>Records</th></tr></thead><tbody>
+    ${j1.records.slice(0,12).map(r=>`<tr><td><strong>${r.city}</strong></td><td>${r.avg_aqi} <span class="bar-bg"><span class="bar-fg" style="width:${(r.avg_aqi/maxA*100).toFixed(1)}%;background:var(--red)"></span></span></td><td>${r.max_aqi}</td><td>${r.min_aqi}</td><td>${fmt(r.record_count)}</td></tr>`).join('')}
+    </tbody></table></div></div></div></div>`;
+  html += `<div class="job-card"><div class="job-head"><strong>Job 2 — Critical AQI Detection</strong><span style="color:var(--green)">● Complete</span></div><div class="job-body">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mapper filters AQI &gt; 200. Reducer classifies: <code>SEVERE</code> (&gt;400), <code>VERY_POOR</code> (&gt;300), <code>POOR</code> (&gt;200).</p>
+    <pre>$ hadoop jar hadoop-streaming.jar \\
+  -input  hdfs:///data/air-quality-india-2025.csv \\
+  -output hdfs:///output/airquality/critical \\
+  -mapper  mapper_aqi_critical.py \\
+  -reducer reducer_aqi_critical.py</pre>
+    <div style="margin-top:10px"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>City</th><th>State</th><th>AQI</th><th>PM2.5</th><th>Flag</th></tr></thead><tbody>
+    ${j2.records.slice(0,15).map(r=>`<tr><td>${r.date}</td><td><strong>${r.city}</strong></td><td>${r.state}</td><td>${r.aqi}</td><td>${r.pm25}</td><td class="${r.flag==='SEVERE'?'flag-severe':'flag-poor'}">${r.flag}</td></tr>`).join('')}
+    </tbody></table></div></div></div></div>`;
+  document.getElementById('tab-hadoop').innerHTML = html;
+}
+
+// ─── Shared Hadoop helpers ───────────────────────────────────
+function buildHadoopHTML(ds, j1, j2, maxS, events) {
+  let html = `<div class="hadoop-header">Hadoop MapReduce Jobs <span class="pill">Streaming API</span></div>`;
+  html += buildPipeline();
+  html += `<div class="job-card"><div class="job-head"><strong>Job 1 — Region Stock Aggregation</strong><span style="color:var(--green)">● Complete</span></div><div class="job-body">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mapper emits <code>region → stock</code>. Reducer sums, averages, counts per region.</p>
+    <pre>$ hadoop jar hadoop-streaming.jar \\
+  -input  hdfs:///data/rice-raw-2025.csv \\
+  -output hdfs:///output/foodstock/region_stock \\
+  -mapper  mapper_region_stock.py \\
+  -reducer reducer_region_stock.py</pre>
+    <div style="margin-top:10px"><div class="tbl-wrap"><table><thead><tr><th>Region</th><th>Total Stock (M MT)</th><th>Avg Stock</th><th>Records</th></tr></thead><tbody>
+    ${j1.records.slice(0,12).map(r=>`<tr><td><strong>${r.region}</strong></td><td>${fmt(r.total_stock)} <span class="bar-bg"><span class="bar-fg" style="width:${(r.total_stock/maxS*100).toFixed(1)}%;background:var(--green)"></span></span></td><td>${r.avg_stock.toFixed(4)}</td><td>${fmt(r.record_count)}</td></tr>`).join('')}
+    </tbody></table></div></div></div></div>`;
+  html += `<div class="job-card"><div class="job-head"><strong>Job 2 — Daily Drawdown Detection</strong><span style="color:var(--green)">● Complete</span></div><div class="job-body">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mapper emits <code>date → stock</code>. Reducer flags DRAWDOWN if single-day drop &gt; 5M MT.</p>
+    <pre>$ hadoop jar hadoop-streaming.jar \\
+  -input  hdfs:///data/rice-raw-2025.csv \\
+  -output hdfs:///output/foodstock/daily_drawdown \\
+  -mapper  mapper_daily_drawdown.py \\
+  -reducer reducer_daily_drawdown.py</pre>
+    <div style="margin-top:10px"><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Stock (M)</th><th>Delta (M)</th><th>% Chg</th><th>Flag</th></tr></thead><tbody>
+    ${events.map(r=>`<tr><td>${r.date}</td><td>${fmt(r.stock_M)}</td><td class="${r.delta_M<0?'down':'up'}">${r.delta_M>0?'+':''}${fmt(r.delta_M)}</td><td class="${r.pct_chg<0?'down':'up'}">${r.pct_chg>0?'+':''}${r.pct_chg}%</td><td class="flag-severe">DRAWDOWN</td></tr>`).join('')}
+    </tbody></table></div></div></div></div>`;
+  return html;
+}
+
+function buildPipeline() {
+  return `<div class="pipeline-flow">
+    <span class="pipe-step">📂 MySQL / CSV</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step">🔄 Sqoop Import</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step">💾 HDFS Storage</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step">⚡ MapReduce</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step">🗄️ HBase</span><span class="pipe-arrow">→</span>
+    <span class="pipe-step">📊 Dashboard</span>
+  </div>`;
+}
+
+// ─── Chart factories ─────────────────────────────────────────
+function mkLine(id, labels, data, label, color, fill=true) {
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'line', data:{labels, datasets:[{label,data,borderColor:color,backgroundColor:color+'18',fill,tension:.35,pointRadius:0,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{maxTicksLimit:8,maxRotation:0}},y:{grid:{color:gridColor}}}}
+  });
+}
+function mkBar(id, labels, data, label, color) {
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'bar', data:{labels,datasets:[{label,data,backgroundColor:color+'cc',borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor}},y:{grid:{color:gridColor}}}}
+  });
+}
+function mkHBar(id, labels, data, label, color) {
+  color = color || ACCENT;
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'bar', data:{labels,datasets:[{label,data,backgroundColor:PALETTE.map(c=>c+'cc'),borderRadius:4,borderSkipped:false}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor}},y:{grid:{color:'transparent'}}}}
+  });
+}
+function mkDelta(id, labels, data) {
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'bar', data:{labels,datasets:[{data,backgroundColor:data.map(v=>v>=0?'#4ade8099':'#f8717199'),borderRadius:2,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{maxTicksLimit:6,maxRotation:0}},y:{grid:{color:gridColor}}}}
+  });
+}
+function mkStackedArea(id, labels, series, legendId, stacked=true) {
+  const names = Object.keys(series);
+  if (legendId) {
+    document.getElementById(legendId).innerHTML = names.map((n,i)=>`<span><i style="background:${PALETTE[i]}"></i>${n}</span>`).join('');
+  }
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'line', data:{labels, datasets:names.map((n,i)=>({label:n,data:series[n],borderColor:PALETTE[i],backgroundColor:PALETTE_A[i],fill:stacked,tension:.3,pointRadius:3,borderWidth:1.5}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor}},y:{stacked,grid:{color:gridColor}}}}
+  });
+}
+
+// ─── Init ────────────────────────────────────────────────────
+(async () => {
+  initTabs();
+  if (DATASET === 'foodstock')  await initFood();
+  if (DATASET === 'rainfall')   await initRain();
+  if (DATASET === 'airquality') await initAir();
+  tabsLoaded.trends = true;
+  loadTab('trends');
+})();
+</script>
+</body>
+</html>
